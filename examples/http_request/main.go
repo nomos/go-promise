@@ -10,7 +10,7 @@ import (
 )
 
 func parseJSON(data []byte) *promise.Promise {
-	return promise.New(func(resolve func(interface{}), reject func(error)) {
+	return promise.New(func(resolve func(interface{}), reject func(interface{})) {
 		var body = make(map[string]string)
 
 		err := json.Unmarshal(data, &body)
@@ -23,7 +23,7 @@ func parseJSON(data []byte) *promise.Promise {
 }
 
 func main() {
-	var requestPromise = promise.New(func(resolve func(interface{}), reject func(error)) {
+	var requestPromise = promise.New(func(resolve func(interface{}), reject func(interface{})) {
 		resp, err := http.Get("https://httpbin.org/ip")
 		defer resp.Body.Close()
 		if err != nil {

@@ -3,6 +3,7 @@ package promise
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
 // A Promise is a proxy for a value not necessarily known when
@@ -23,7 +24,7 @@ type Promise struct {
 	// asynchronous work, and then, once that completes, either calls the
 	// resolve function to resolve the promise or else rejects it if
 	// an error or panic occurred.
-	executor func(resolve func(interface{}), reject func(error))
+	executor func(resolve func(interface{}), reject func(interface{}))
 
 	// Stores the result passed to resolve()
 	result interface{}
@@ -38,8 +39,40 @@ type Promise struct {
 	wg sync.WaitGroup
 }
 
-// New instantiates and returns a pointer to a new Promise.
-func New(executor func(resolve func(interface{}), reject func(error))) *Promise {
+type Timeout struct {
+	closeChan chan struct{}
+}
+
+func (this *Timeout) Close(){
+	this.closeChan<- struct{}{}
+}
+
+func SetTimeout(duration time.Duration,f func())*Timeout {
+	ret := &Timeout{
+		closeChan:make(chan struct{}),
+	}
+	go func() {
+		for {
+			select {
+			case <-ret.closeChan:
+				return
+			case <-time.After(duration):
+				f()
+				return
+			}
+		}
+		f()
+	}()
+	return ret
+}
+
+func Await(p *Promise)(interface{},error) {
+	return p.Await()
+
+}
+
+// Async instantiates and returns a pointer to a new Promise.
+func Async(executor func(resolve func(interface{}), reject func(interface{}))) *Promise {
 	var promise = &Promise{
 		pending:  true,
 		executor: executor,
@@ -85,15 +118,18 @@ func (promise *Promise) resolve(resolution interface{}) {
 	promise.mutex.Unlock()
 }
 
-func (promise *Promise) reject(err error) {
+func (promise *Promise) reject(err interface{}) {
 	promise.mutex.Lock()
 	defer promise.mutex.Unlock()
 
 	if !promise.pending {
 		return
 	}
-
-	promise.err = err
+	if err1,ok:=err.(error);ok {
+		promise.err = err1
+	} else {
+		promise.err = errors.New(err.(string))
+	}
 	promise.pending = false
 
 	promise.wg.Done()
@@ -102,14 +138,18 @@ func (promise *Promise) reject(err error) {
 func (promise *Promise) handlePanic() {
 	var r = recover()
 	if r != nil {
-		promise.reject(errors.New(r.(string)))
+		if err,ok:=r.(error);ok {
+			promise.reject(errors.New(err.Error()))
+		} else {
+			promise.reject(errors.New(r.(string)))
+		}
 	}
 }
 
 // Then appends fulfillment and rejection handlers to the promise,
 // and returns a new promise resolving to the return value of the called handler.
 func (promise *Promise) Then(fulfillment func(data interface{}) interface{}) *Promise {
-	return New(func(resolve func(interface{}), reject func(error)) {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		result, err := promise.Await()
 		if err != nil {
 			reject(err)
@@ -121,8 +161,8 @@ func (promise *Promise) Then(fulfillment func(data interface{}) interface{}) *Pr
 
 // Catch Appends a rejection handler to the promise,
 // and returns a new promise resolving to the return value of the handler.
-func (promise *Promise) Catch(rejection func(err error) error) *Promise {
-	return New(func(resolve func(interface{}), reject func(error)) {
+func (promise *Promise) Catch(rejection func(err error) interface{}) *Promise {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		result, err := promise.Await()
 		if err != nil {
 			reject(rejection(err))
@@ -155,7 +195,7 @@ func All(promises ...*Promise) *Promise {
 		return Resolve(make([]interface{}, 0))
 	}
 
-	return New(func(resolve func(interface{}), reject func(error)) {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		resolutionsChan := make(chan resolutionHelper, psLen)
 		errorChan := make(chan error, psLen)
 
@@ -164,7 +204,7 @@ func All(promises ...*Promise) *Promise {
 				promise.Then(func(data interface{}) interface{} {
 					resolutionsChan <- resolutionHelper{i, data}
 					return data
-				}).Catch(func(err error) error {
+				}).Catch(func(err error) interface{} {
 					errorChan <- err
 					return err
 				})
@@ -195,7 +235,7 @@ func Race(promises ...*Promise) *Promise {
 		return Resolve(nil)
 	}
 
-	return New(func(resolve func(interface{}), reject func(error)) {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		resolutionsChan := make(chan interface{}, psLen)
 		errorChan := make(chan error, psLen)
 
@@ -203,7 +243,7 @@ func Race(promises ...*Promise) *Promise {
 			promise.Then(func(data interface{}) interface{} {
 				resolutionsChan <- data
 				return data
-			}).Catch(func(err error) error {
+			}).Catch(func(err error) interface{} {
 				errorChan <- err
 				return err
 			})
@@ -228,7 +268,7 @@ func AllSettled(promises ...*Promise) *Promise {
 		return Resolve(nil)
 	}
 
-	return New(func(resolve func(interface{}), reject func(error)) {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		resolutionsChan := make(chan resolutionHelper, psLen)
 
 		for index, promise := range promises {
@@ -236,7 +276,7 @@ func AllSettled(promises ...*Promise) *Promise {
 				promise.Then(func(data interface{}) interface{} {
 					resolutionsChan <- resolutionHelper{i, data}
 					return data
-				}).Catch(func(err error) error {
+				}).Catch(func(err error) interface{} {
 					resolutionsChan <- resolutionHelper{i, err}
 					return err
 				})
@@ -254,14 +294,14 @@ func AllSettled(promises ...*Promise) *Promise {
 
 // Resolve returns a Promise that has been resolved with a given value.
 func Resolve(resolution interface{}) *Promise {
-	return New(func(resolve func(interface{}), reject func(error)) {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		resolve(resolution)
 	})
 }
 
 // Reject returns a Promise that has been rejected with a given error.
 func Reject(err error) *Promise {
-	return New(func(resolve func(interface{}), reject func(error)) {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		reject(err)
 	})
 }

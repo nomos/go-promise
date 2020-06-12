@@ -8,7 +8,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	var promise = New(func(resolve func(interface{}), reject func(error)) {
+	var promise = Async(func(resolve func(interface{}), reject func(interface{})) {
 		resolve(nil)
 	})
 
@@ -18,7 +18,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestPromise_Then(t *testing.T) {
-	var promise = New(func(resolve func(interface{}), reject func(error)) {
+	var promise = Async(func(resolve func(interface{}), reject func(interface{})) {
 		resolve(1 + 1)
 	})
 
@@ -41,8 +41,8 @@ func TestPromise_Then(t *testing.T) {
 }
 
 func TestPromise_ThenNested(t *testing.T) {
-	var promise = New(func(resolve func(interface{}), reject func(error)) {
-		resolve(New(func(res func(interface{}), rej func(error)) {
+	var promise = Async(func(resolve func(interface{}), reject func(interface{})) {
+		resolve(Async(func(res func(interface{}), rej func(interface{})) {
 			res("Hello, World")
 		}))
 	})
@@ -63,7 +63,7 @@ func TestPromise_ThenNested(t *testing.T) {
 }
 
 func TestPromise_Catch(t *testing.T) {
-	var promise = New(func(resolve func(interface{}), reject func(error)) {
+	var promise = Async(func(resolve func(interface{}), reject func(interface{})) {
 		reject(errors.New("very serious err"))
 	})
 
@@ -93,8 +93,8 @@ func TestPromise_Catch(t *testing.T) {
 }
 
 func TestPromise_CatchNested(t *testing.T) {
-	var promise = New(func(resolve func(interface{}), reject func(error)) {
-		resolve(New(func(res func(interface{}), rej func(error)) {
+	var promise = Async(func(resolve func(interface{}), reject func(interface{})) {
+		resolve(Async(func(res func(interface{}), rej func(interface{})) {
 			rej(errors.New("nested fail"))
 		}))
 	})
@@ -115,7 +115,7 @@ func TestPromise_CatchNested(t *testing.T) {
 }
 
 func TestPromise_Panic(t *testing.T) {
-	var promise = New(func(resolve func(interface{}), reject func(error)) {
+	var promise = Async(func(resolve func(interface{}), reject func(interface{})) {
 		panic("much panic")
 	})
 
@@ -132,7 +132,7 @@ func TestPromise_Await(t *testing.T) {
 	var promises = make([]*Promise, 10)
 
 	for x := 0; x < 10; x++ {
-		var promise = New(func(resolve func(interface{}), reject func(error)) {
+		var promise = Async(func(resolve func(interface{}), reject func(interface{})) {
 			resolve(time.Now())
 		})
 

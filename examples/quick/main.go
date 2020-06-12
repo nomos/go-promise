@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	var p = promise.New(func(resolve func(interface{}), reject func(error)) {
+	var p = promise.New(func(resolve func(interface{}), reject func(interface{})) {
 		// Do something asynchronously.
 		const sum = 2 + 2
 

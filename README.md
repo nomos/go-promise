@@ -22,7 +22,7 @@ Note that the library **will be updated** as soon as generics arrive in Go 2.0 t
 
 ## Quick Start
 ```go
-var p = promise.New(func(resolve func(interface{}), reject func(error)) {
+var p = promise.New(func(resolve func(interface{}), reject func(interface{})) {
   // Do something asynchronously.
   const sum = 2 + 2
 
@@ -152,7 +152,7 @@ fmt.Println(err)
 
 ### [HTTP Request](https://github.com/chebyrash/promise/blob/master/examples/http_request/main.go)
 ```go
-var requestPromise = promise.New(func(resolve func(interface{}), reject func(error)) {
+var requestPromise = promise.New(func(resolve func(interface{}), reject func(interface{})) {
   resp, err := http.Get("https://httpbin.org/ip")
   defer resp.Body.Close()
   if err != nil {

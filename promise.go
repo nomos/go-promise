@@ -38,8 +38,12 @@ type Promise struct {
 	wg sync.WaitGroup
 }
 
+func Await(p *Promise)(interface{},error) {
+	return p.Await()
+}
+
 // New instantiates and returns a pointer to a new Promise.
-func New(executor func(resolve func(interface{}), reject func(error))) *Promise {
+func Async(executor func(resolve func(interface{}), reject func(error))) *Promise {
 	var promise = &Promise{
 		pending:  true,
 		executor: executor,

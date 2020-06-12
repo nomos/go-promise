@@ -9,7 +9,7 @@ import (
 func BenchmarkNew(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		New(func(resolve func(interface{}), reject func(error)) {
+		Async(func(resolve func(interface{}), reject func(error)) {
 			resolve(nil)
 		})
 	}
@@ -18,7 +18,7 @@ func BenchmarkNew(b *testing.B) {
 func BenchmarkThen(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		var promise = New(func(resolve func(interface{}), reject func(error)) {
+		var promise = Async(func(resolve func(interface{}), reject func(error)) {
 			resolve(1 + 1)
 		})
 
@@ -40,7 +40,7 @@ func BenchmarkThen(b *testing.B) {
 func BenchmarkCatch(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		var promise = New(func(resolve func(interface{}), reject func(error)) {
+		var promise = Async(func(resolve func(interface{}), reject func(error)) {
 			reject(errors.New("very serious err"))
 		})
 
@@ -67,7 +67,7 @@ func BenchmarkAwait(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for x := 0; x < 10; x++ {
 
-			var promise = New(func(resolve func(interface{}), reject func(error)) {
+			var promise = Async(func(resolve func(interface{}), reject func(error)) {
 				resolve(time.Now())
 			})
 

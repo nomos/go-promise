@@ -32,7 +32,7 @@ func TestPromise_Then(t *testing.T) {
 			}
 			return nil
 		}).
-		Catch(func(err error) error {
+		Catch(func(err error) interface{} {
 			t.Error("Catch triggered in .Then test")
 			return nil
 		})
@@ -54,7 +54,7 @@ func TestPromise_ThenNested(t *testing.T) {
 			}
 			return nil
 		}).
-		Catch(func(err error) error {
+		Catch(func(err error) interface{} {
 			t.Error("Catch triggered in .Then test")
 			return nil
 		})
@@ -72,13 +72,13 @@ func TestPromise_Catch(t *testing.T) {
 			t.Error("Then 1 triggered in .Catch test")
 			return nil
 		}).
-		Catch(func(err error) error {
+		Catch(func(err error) interface{} {
 			if err.Error() == "very serious err" {
 				return errors.New("dealing with err at this stage")
 			}
 			return err
 		}).
-		Catch(func(err error) error {
+		Catch(func(err error) interface{} {
 			if err.Error() != "dealing with err at this stage" {
 				t.Error("Error doesn't propagate")
 			}
@@ -104,7 +104,7 @@ func TestPromise_CatchNested(t *testing.T) {
 			t.Error("Then triggered in .Catch test")
 			return nil
 		}).
-		Catch(func(err error) error {
+		Catch(func(err error) interface{} {
 			if err.Error() != "nested fail" {
 				t.Error("Rejected promise doesn't flatten")
 			}
@@ -186,7 +186,7 @@ func TestPromise_Reject(t *testing.T) {
 		Then(func(data interface{}) interface{} {
 			return data.(int) + 1
 		}).
-		Catch(func(err error) error {
+		Catch(func(err error) interface{} {
 			if err.Error() != "rejected" {
 				t.Errorf("Catch rejected with unexpected value: %v", err)
 			}

@@ -43,30 +43,69 @@ type Timeout struct {
 	closeChan chan struct{}
 }
 
-func (this *Timeout) Close(){
-	this.closeChan<- struct{}{}
+func (this *Timeout) Close() {
+	go func() {
+		this.closeChan <- struct{}{}
+	}()
 }
 
-func SetTimeout(duration time.Duration,f func())*Timeout {
-	ret := &Timeout{
-		closeChan:make(chan struct{}),
+type Interval struct {
+	interval time.Duration
+	ticker *time.Ticker
+	closeChan chan struct{}
+	f func()
+}
+
+func (this *Interval) Close() {
+	go func() {
+		this.closeChan <- struct{}{}
+	}()
+}
+
+func (this *Timeout) execute(duration time.Duration, f func()) {
+	this.closeChan = make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-this.closeChan:
+				return
+			case <-time.After(duration):
+				f()
+				close(this.closeChan)
+				return
+			}
+		}
+	}()
+}
+
+func SetTimeout(duration time.Duration, f func()) *Timeout {
+	ret := &Timeout{}
+	ret.execute(duration, f)
+	return ret
+}
+
+func SetInterval(duration time.Duration, f func()) *Interval{
+	ret := &Interval{
+		interval:  duration,
+		ticker:    time.NewTicker(duration),
+		closeChan: nil,
+		f:f,
 	}
 	go func() {
 		for {
 			select {
-			case <-ret.closeChan:
-				return
-			case <-time.After(duration):
+			case <-ret.ticker.C:
 				f()
+			case <-ret.closeChan:
+				close(ret.closeChan)
 				return
 			}
 		}
-		f()
 	}()
 	return ret
 }
 
-func Await(p *Promise)(interface{},error) {
+func Await(p *Promise) (interface{}, error) {
 	return p.Await()
 
 }
@@ -125,7 +164,7 @@ func (promise *Promise) reject(err interface{}) {
 	if !promise.pending {
 		return
 	}
-	if err1,ok:=err.(error);ok {
+	if err1, ok := err.(error); ok {
 		promise.err = err1
 	} else {
 		promise.err = errors.New(err.(string))
@@ -138,7 +177,7 @@ func (promise *Promise) reject(err interface{}) {
 func (promise *Promise) handlePanic() {
 	var r = recover()
 	if r != nil {
-		if err,ok:=r.(error);ok {
+		if err, ok := r.(error); ok {
 			promise.reject(errors.New(err.Error()))
 		} else {
 			promise.reject(errors.New(r.(string)))
@@ -178,6 +217,13 @@ func (promise *Promise) Catch(rejection func(err error) interface{}) *Promise {
 func (promise *Promise) Await() (interface{}, error) {
 	promise.wg.Wait()
 	return promise.result, promise.err
+}
+
+func (promise *Promise) AsCallback(f func(interface{},error)) {
+	go func() {
+		promise.wg.Wait()
+		f(promise.result, promise.err)
+	}()
 }
 
 type resolutionHelper struct {

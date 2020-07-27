@@ -40,7 +40,12 @@ type Promise struct {
 }
 
 type Timeout struct {
+	isClose bool
 	closeChan chan struct{}
+}
+
+func (this *Timeout) IsClose() bool{
+	return this.closeChan == nil
 }
 
 func (this *Timeout) Close() {
@@ -48,6 +53,7 @@ func (this *Timeout) Close() {
 		this.closeChan <- struct{}{}
 	}()
 }
+
 
 type Interval struct {
 	interval time.Duration
@@ -71,6 +77,7 @@ func (this *Timeout) execute(duration time.Duration, f func()) {
 				return
 			case <-time.After(duration):
 				f()
+				this.isClose = true
 				close(this.closeChan)
 				return
 			}
@@ -79,7 +86,9 @@ func (this *Timeout) execute(duration time.Duration, f func()) {
 }
 
 func SetTimeout(duration time.Duration, f func()) *Timeout {
-	ret := &Timeout{}
+	ret := &Timeout{
+		isClose: true,
+	}
 	ret.execute(duration, f)
 	return ret
 }

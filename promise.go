@@ -15,18 +15,18 @@ import (
 type Promise struct {
 	pending bool
 
-	// A function that is passed with the arguments resolve and reject.
+	// A function that is passed with the arguments Resolve and reject.
 	// The executor function is executed immediately by the Promise implementation,
-	// passing resolve and reject functions (the executor is called
+	// passing Resolve and reject functions (the executor is called
 	// before the Promise constructor even returns the created object).
-	// The resolve and reject functions, when called, resolve or reject
+	// The Resolve and reject functions, when called, Resolve or reject
 	// the promise, respectively. The executor normally initiates some
 	// asynchronous work, and then, once that completes, either calls the
-	// resolve function to resolve the promise or else rejects it if
+	// Resolve function to Resolve the promise or else rejects it if
 	// an error or panic occurred.
 	executor func(resolve func(interface{}), reject func(interface{}))
 
-	// Stores the result passed to resolve()
+	// Stores the result passed to Resolve()
 	result interface{}
 
 	// Stores the error passed to reject()
@@ -60,6 +60,10 @@ type Interval struct {
 	ticker *time.Ticker
 	closeChan chan struct{}
 	f func()
+}
+
+func (this *Interval) IsClose() bool{
+	return this.closeChan == nil
 }
 
 func (this *Interval) Close() {
@@ -134,13 +138,13 @@ func Async(executor func(resolve func(interface{}), reject func(interface{}))) *
 
 	go func() {
 		defer promise.handlePanic()
-		promise.executor(promise.resolve, promise.reject)
+		promise.executor(promise.Resolve, promise.Reject)
 	}()
 
 	return promise
 }
 
-func (promise *Promise) resolve(resolution interface{}) {
+func (promise *Promise) Resolve(resolution interface{}) {
 	promise.mutex.Lock()
 
 	if !promise.pending {
@@ -153,7 +157,7 @@ func (promise *Promise) resolve(resolution interface{}) {
 		flattenedResult, err := result.Await()
 		if err != nil {
 			promise.mutex.Unlock()
-			promise.reject(err)
+			promise.Reject(err)
 			return
 		}
 		promise.result = flattenedResult
@@ -166,7 +170,7 @@ func (promise *Promise) resolve(resolution interface{}) {
 	promise.mutex.Unlock()
 }
 
-func (promise *Promise) reject(err interface{}) {
+func (promise *Promise) Reject(err interface{}) {
 	promise.mutex.Lock()
 	defer promise.mutex.Unlock()
 
@@ -187,9 +191,9 @@ func (promise *Promise) handlePanic() {
 	var r = recover()
 	if r != nil {
 		if err, ok := r.(error); ok {
-			promise.reject(errors.New(err.Error()))
+			promise.Reject(errors.New(err.Error()))
 		} else {
-			promise.reject(errors.New(r.(string)))
+			promise.Reject(errors.New(r.(string)))
 		}
 	}
 }
@@ -314,7 +318,7 @@ func Race(promises ...*Promise) *Promise {
 	})
 }
 
-// AllSettled waits until all promises have settled (each may resolve, or reject).
+// AllSettled waits until all promises have settled (each may Resolve, or reject).
 // Returns a promise that resolves after all of the given promises have either resolved or rejected,
 // with an array of objects that each describe the outcome of each promise.
 func AllSettled(promises ...*Promise) *Promise {

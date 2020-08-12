@@ -50,7 +50,9 @@ func (this *Timeout) IsClose() bool{
 
 func (this *Timeout) Close() {
 	go func() {
-		this.closeChan <- struct{}{}
+		if this.closeChan!=nil {
+			this.closeChan <- struct{}{}
+		}
 	}()
 }
 
@@ -242,6 +244,21 @@ func (promise *Promise) AsCallback(f func(interface{},error)) {
 type resolutionHelper struct {
 	index int
 	data  interface{}
+}
+
+func Each(promises ...*Promise)*Promise {
+	return Async(func(resolve func(interface{}), reject func(interface{})) {
+		resolutions := make([]interface{}, 0)
+		for _, promise := range promises {
+			result,err:=promise.Await()
+			if err != nil {
+				reject(err)
+				return
+			}
+			resolutions = append(resolutions, result)
+		}
+		resolve(resolutions)
+	})
 }
 
 // All waits for all promises to be resolved, or for any to be rejected.

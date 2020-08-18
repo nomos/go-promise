@@ -35,36 +35,39 @@ type Promise struct {
 	// Mutex protects against data race conditions.
 	mutex sync.Mutex
 
+	elapseTime time.Duration
+
+	calTime bool
+
 	// WaitGroup allows to block until all callbacks are executed.
 	wg sync.WaitGroup
 }
 
 type Timeout struct {
-	isClose bool
+	isClose   bool
 	closeChan chan struct{}
 }
 
-func (this *Timeout) IsClose() bool{
+func (this *Timeout) IsClose() bool {
 	return this.closeChan == nil
 }
 
 func (this *Timeout) Close() {
 	go func() {
-		if this.closeChan!=nil {
+		if this.closeChan != nil {
 			this.closeChan <- struct{}{}
 		}
 	}()
 }
 
-
 type Interval struct {
-	interval time.Duration
-	ticker *time.Ticker
+	interval  time.Duration
+	ticker    *time.Ticker
 	closeChan chan struct{}
-	f func()
+	f         func()
 }
 
-func (this *Interval) IsClose() bool{
+func (this *Interval) IsClose() bool {
 	return this.closeChan == nil
 }
 
@@ -85,6 +88,7 @@ func (this *Timeout) execute(duration time.Duration, f func()) {
 				f()
 				this.isClose = true
 				close(this.closeChan)
+				this.closeChan = nil
 				return
 			}
 		}
@@ -99,12 +103,12 @@ func SetTimeout(duration time.Duration, f func()) *Timeout {
 	return ret
 }
 
-func SetInterval(duration time.Duration, f func()) *Interval{
+func SetInterval(duration time.Duration, f func()) *Interval {
 	ret := &Interval{
 		interval:  duration,
 		ticker:    time.NewTicker(duration),
 		closeChan: nil,
-		f:f,
+		f:         f,
 	}
 	go func() {
 		for {
@@ -123,6 +127,15 @@ func SetInterval(duration time.Duration, f func()) *Interval{
 func Await(p *Promise) (interface{}, error) {
 	return p.Await()
 
+}
+
+func (promise *Promise) CalTime() *Promise {
+	promise.calTime = true
+	return promise
+}
+
+func (promise *Promise) Elapse() time.Duration {
+	return promise.elapseTime
 }
 
 // Async instantiates and returns a pointer to a new Promise.
@@ -230,11 +243,17 @@ func (promise *Promise) Catch(rejection func(err error) interface{}) *Promise {
 // Returns value and error.
 // Call on an already resolved Promise to get its result and error
 func (promise *Promise) Await() (interface{}, error) {
+	if promise.calTime {
+		start:=time.Now()
+		promise.wg.Wait()
+		promise.elapseTime = time.Now().Sub(start)
+		return promise.result, promise.err
+	}
 	promise.wg.Wait()
 	return promise.result, promise.err
 }
 
-func (promise *Promise) AsCallback(f func(interface{},error)) {
+func (promise *Promise) AsCallback(f func(interface{}, error)) {
 	go func() {
 		promise.wg.Wait()
 		f(promise.result, promise.err)
@@ -246,11 +265,11 @@ type resolutionHelper struct {
 	data  interface{}
 }
 
-func Each(promises ...*Promise)*Promise {
+func Each(promises ...*Promise) *Promise {
 	return Async(func(resolve func(interface{}), reject func(interface{})) {
 		resolutions := make([]interface{}, 0)
 		for _, promise := range promises {
-			result,err:=promise.Await()
+			result, err := promise.Await()
 			if err != nil {
 				reject(err)
 				return
